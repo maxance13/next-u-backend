@@ -1,12 +1,17 @@
-'use strict'
-const database = require('../utils/database')
-const { stringIsAMatch, hashString, generateToken, validateToken } = require('../utils/index')
+"use strict";
+const database = require("../utils/database");
+const {
+  stringIsAMatch,
+  hashString,
+  generateToken,
+  validateToken,
+} = require("../utils/index");
 
 module.exports = async function (fastify, opts) {
-  const log = fastify.log
+  const log = fastify.log;
 
   // --- GET USER PROFILE ---
-  // this route should use the value from "req.userId" to make a query into the "user" table with said userId.
+  //  // this route should use the value from "req.userId" to make a query into the "user" table with said userId.
   // the response body should be include the following fields: user.email, user.username and user.token
   // example response:
   // {
@@ -17,13 +22,21 @@ module.exports = async function (fastify, opts) {
   //   }
   // }
   fastify.route({
-    url: '/api/user',
-    method: 'GET',
+    url: "/api/user",
+    method: "GET",
     preHandler: validateToken,
     handler: async (req, reply) => {
       // add the route implementation here
-    }
-  })
+      const user = await database("user").where({ id: req.userId }).first();
+      return {
+        user: {
+          email: user.email,
+          username: user.username,
+          token: user.token,
+        },
+      };
+    },
+  });
 
   // --- SIGN UP ---
   // this route should receive the following fields on the request body: user.username, user.email and user.password
@@ -41,17 +54,26 @@ module.exports = async function (fastify, opts) {
   // }
   // HINT: remember that all utility methods ( hashString and generateToken ) are asynchronous functions! they need to be used with "await"
   fastify.route({
-    url: '/api/users',
-    method: 'POST',
+    url: "/api/users",
+    method: "POST",
     handler: async (req, reply) => {
       // add the route implementation here
-    }
-  })
+      const { username, email, password } = req.body.user;
+      const token = await generateToken();
+      const hashedPassword = await hashString(password);
+      await database("user").insert({
+        username,
+        email,
+        password: hashedPassword,
+        token,
+      });
+    },
+  });
 
   // --- LOGIN ---
   // this route should receive on the request body only two fields: user.email and user.password
   // the route should first retrieve the user from the database, filtering the SQL query by the email provided
-  // once with the user retrieved, you should use the utility method "stringIsAMatch" to compare the password included in the 
+  // once with the user retrieved, you should use the utility method "stringIsAMatch" to compare the password included in the
   // request body with the password from the user in the database.
   // if the passwords are a match, the response of the request should include: email, user's token and username
   // example response on this case:
@@ -65,33 +87,36 @@ module.exports = async function (fastify, opts) {
   // if the passwords are NOT a match, the response should have a status code 401 and
   // the request body should have a "message" field with the value "invalid credentials"
   // HINT: remember that all utility methods ( hashString and generateToken ) are asynchronous functions! they need to be used with "await"
-  fastify.post('/api/users/login', async function (req, reply) {
+  fastify.post("/api/users/login", async function (req, reply) {
     // add the route implementation here
-    const { email, password } = req.body.user
-    const user = await database('user').where({ email }).first()
-    const equal = await stringIsAMatch(password, user.password)
+    const { email, password } = req.body.user;
+    const user = await database("user").where({ email }).first();
+    const equal = await stringIsAMatch(password, user.password);
     if (!equal) {
-      reply.status(401)
+      reply.status(401);
       return {
-        message: 'Invalid credentials'
-      }
+        message: "Invalid credentials",
+      };
     }
     return {
       user: {
         username: user.username,
         token: user.token,
         email: user.email,
-      }
-    }
-  })
+      },
+    };
+  });
 
   // --- do not modify ---
-  fastify.put('/api/user', async (req, reply) => req.body)
+  fastify.put("/api/user", async (req, reply) => req.body);
   // --- do not modify ---
-  fastify.get('/api/profiles/:username', async (req, reply) => {
-    const user = await database('user').select(['username', 'bio', 'image']).where({ username: req.params.username }).first()
+  fastify.get("/api/profiles/:username", async (req, reply) => {
+    const user = await database("user")
+      .select(["username", "bio", "image"])
+      .where({ username: req.params.username })
+      .first();
     return {
-      profile: user
-    }
-  })
-}
+      profile: user,
+    };
+  });
+};
